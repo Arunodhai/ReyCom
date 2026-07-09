@@ -1,5 +1,7 @@
 package com.reydark.reycom;
 
+import com.reydark.reycom.repository.CategoryRepository;
+import com.reydark.reycom.repository.ProductRepository;
 import com.reydark.reycom.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,6 +16,12 @@ class ReycomApplicationTests {
 
     @MockBean
     private UserRepository userRepository;
+
+    @MockBean
+    private CategoryRepository categoryRepository;
+
+    @MockBean
+    private ProductRepository productRepository;
 
     @Test
     void contextLoads() {
