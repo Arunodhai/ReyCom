@@ -208,9 +208,11 @@
                 <label>Selected Order ID<input id="selectedOrderId" placeholder="select from list or paste"></label>
                 <div class="actions row">
                     <button id="fetchOrderBtn" class="secondary">Fetch selected</button>
+                    <button id="fetchOrderEventsBtn" class="secondary">Fetch events</button>
                     <button id="cancelOrderBtn" class="secondary danger">Cancel selected</button>
                 </div>
                 <div id="ordersBox" class="list"></div>
+                <div id="orderEventsBox" class="list"></div>
             </div>
         </section>
 
@@ -275,7 +277,9 @@
                         </select>
                     </label>
                     <button id="updateOrderStatusBtn">Update status</button>
+                    <button id="fetchAdminOrderEventsBtn" class="secondary">Fetch events</button>
                     <div id="adminOrdersBox" class="list"></div>
+                    <div id="adminOrderEventsBox" class="list"></div>
                 </div>
 
                 <div class="panel">

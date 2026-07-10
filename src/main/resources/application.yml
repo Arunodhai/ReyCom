@@ -13,6 +13,13 @@ reycom:
       secret: ${JWT_SECRET:reycom-local-development-secret-key-change-me-please}
       expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
+aws:
+  region: ${AWS_REGION:ap-south-1}
+  dynamodb:
+    enabled: ${AWS_DYNAMODB_ENABLED:true}
+    endpoint: ${AWS_DYNAMODB_ENDPOINT:http://localhost:8000}
+    table-name: ${AWS_DYNAMODB_TABLE_NAME:reycom_order_events}
+
 ---
 
 spring:

@@ -215,6 +215,25 @@ async function refreshAdminPayments() {
   renderPayments("#adminPaymentsBox", result.data || []);
 }
 
+async function fetchOrderEvents(orderId, admin = false) {
+  const path = admin ? `/api/admin/orders/${orderId}/events` : `/api/orders/${orderId}/events`;
+  const result = await api(path);
+  renderEvents(admin ? "#adminOrderEventsBox" : "#orderEventsBox", result.data || []);
+  return result;
+}
+
+function renderEvents(selector, events) {
+  $(selector).innerHTML = events.length ? events.map((event) => itemCard(
+    `${event.eventType} · ${event.eventTime}`,
+    [
+      event.message,
+      `Order: ${event.orderStatus || "n/a"}`,
+      `Payment: ${event.paymentStatus || "n/a"}`,
+      `Payment ID: ${event.paymentId || "n/a"}`,
+    ]
+  )).join("") : `<div class="empty">No events found for this order.</div>`;
+}
+
 function renderPayments(selector, payments) {
   $(selector).innerHTML = payments.length ? payments.map((payment) => itemCard(
     `${payment.paymentNumber} · ${payment.status}`,
@@ -318,6 +337,11 @@ function bindButtons() {
     if (!orderId) return log({ success: false, message: "Select or enter an order ID" }, false);
     run(() => api(`/api/orders/${orderId}`));
   });
+  $("#fetchOrderEventsBtn").addEventListener("click", () => {
+    const orderId = $("#selectedOrderId").value.trim();
+    if (!orderId) return log({ success: false, message: "Select or enter an order ID" }, false);
+    run(() => fetchOrderEvents(orderId));
+  });
   $("#cancelOrderBtn").addEventListener("click", () => {
     const orderId = $("#selectedOrderId").value.trim();
     if (!orderId) return log({ success: false, message: "Select or enter an order ID" }, false);
@@ -338,6 +362,11 @@ function bindButtons() {
       method: "PUT",
       body: JSON.stringify({ status: $("#adminOrderStatus").value }),
     }), { refresh: refreshAdminOrders });
+  });
+  $("#fetchAdminOrderEventsBtn").addEventListener("click", () => {
+    const orderId = $("#adminOrderId").value.trim();
+    if (!orderId) return log({ success: false, message: "Select or enter an order ID" }, false);
+    run(() => fetchOrderEvents(orderId, true));
   });
 }
 

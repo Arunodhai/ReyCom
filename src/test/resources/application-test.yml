@@ -20,3 +20,10 @@ reycom:
     jwt:
       secret: reycom-test-secret-key-for-integration-tests-change-me
       expiration-ms: 86400000
+
+aws:
+  region: ap-south-1
+  dynamodb:
+    enabled: false
+    endpoint:
+    table-name: reycom_order_events

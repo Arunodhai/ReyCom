@@ -6,6 +6,7 @@ import com.reydark.reycom.dto.response.PaymentResponse;
 import com.reydark.reycom.entity.Order;
 import com.reydark.reycom.entity.Payment;
 import com.reydark.reycom.entity.User;
+import com.reydark.reycom.enums.OrderEventType;
 import com.reydark.reycom.enums.OrderStatus;
 import com.reydark.reycom.enums.PaymentStatus;
 import com.reydark.reycom.exception.BadRequestException;
@@ -16,6 +17,7 @@ import com.reydark.reycom.repository.OrderRepository;
 import com.reydark.reycom.repository.PaymentRepository;
 import com.reydark.reycom.repository.UserRepository;
 import com.reydark.reycom.security.UserPrincipal;
+import com.reydark.reycom.service.OrderEventService;
 import com.reydark.reycom.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -42,6 +44,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final OrderEventService orderEventService;
 
     @Override
     @Transactional
@@ -65,6 +68,15 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = paymentRepository.findByOrderId(order.getId())
                 .map(existingPayment -> reuseExistingPayment(existingPayment, request))
                 .orElseGet(() -> createPayment(order, user, request));
+        orderEventService.saveEvent(
+                order.getId(),
+                OrderEventType.PAYMENT_INITIATED,
+                "Payment initiated",
+                order.getStatus().name(),
+                payment.getStatus().name(),
+                payment.getId(),
+                user.getId()
+        );
 
         return PaymentMapper.toResponse(payment);
     }
@@ -85,6 +97,15 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setStatus(PaymentStatus.SUCCESS);
         payment.setFailureReason(null);
         payment.getOrder().setStatus(OrderStatus.PAID);
+        orderEventService.saveEvent(
+                payment.getOrder().getId(),
+                OrderEventType.PAYMENT_SUCCESS,
+                "Payment completed successfully",
+                payment.getOrder().getStatus().name(),
+                payment.getStatus().name(),
+                payment.getId(),
+                user.getId()
+        );
 
         return PaymentMapper.toResponse(payment);
     }
@@ -105,6 +126,15 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setStatus(PaymentStatus.FAILED);
         payment.setFailureReason(request.failureReason().trim());
         payment.getOrder().setStatus(OrderStatus.PAYMENT_PENDING);
+        orderEventService.saveEvent(
+                payment.getOrder().getId(),
+                OrderEventType.PAYMENT_FAILED,
+                "Payment failed",
+                payment.getOrder().getStatus().name(),
+                payment.getStatus().name(),
+                payment.getId(),
+                user.getId()
+        );
 
         return PaymentMapper.toResponse(payment);
     }

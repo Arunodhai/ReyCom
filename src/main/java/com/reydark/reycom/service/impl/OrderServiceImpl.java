@@ -8,6 +8,7 @@ import com.reydark.reycom.entity.Inventory;
 import com.reydark.reycom.entity.Order;
 import com.reydark.reycom.entity.OrderItem;
 import com.reydark.reycom.entity.User;
+import com.reydark.reycom.enums.OrderEventType;
 import com.reydark.reycom.enums.OrderStatus;
 import com.reydark.reycom.exception.BadRequestException;
 import com.reydark.reycom.exception.ResourceNotFoundException;
@@ -18,6 +19,7 @@ import com.reydark.reycom.repository.InventoryRepository;
 import com.reydark.reycom.repository.OrderRepository;
 import com.reydark.reycom.repository.UserRepository;
 import com.reydark.reycom.security.UserPrincipal;
+import com.reydark.reycom.service.OrderEventService;
 import com.reydark.reycom.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -46,6 +48,7 @@ public class OrderServiceImpl implements OrderService {
     private final CartRepository cartRepository;
     private final InventoryRepository inventoryRepository;
     private final UserRepository userRepository;
+    private final OrderEventService orderEventService;
 
     @Override
     @Transactional
@@ -92,6 +95,15 @@ public class OrderServiceImpl implements OrderService {
         order.setTotalAmount(totalAmount);
         Order savedOrder = orderRepository.save(order);
         cart.getItems().clear();
+        orderEventService.saveEvent(
+                savedOrder.getId(),
+                OrderEventType.ORDER_CREATED,
+                "Order created successfully",
+                savedOrder.getStatus().name(),
+                null,
+                null,
+                user.getId()
+        );
 
         return OrderMapper.toResponse(savedOrder);
     }
@@ -128,6 +140,15 @@ public class OrderServiceImpl implements OrderService {
 
         restoreInventory(order);
         order.setStatus(OrderStatus.CANCELLED);
+        orderEventService.saveEvent(
+                order.getId(),
+                OrderEventType.ORDER_CANCELLED,
+                "Order cancelled successfully",
+                order.getStatus().name(),
+                null,
+                null,
+                user.getId()
+        );
 
         return OrderMapper.toResponse(order);
     }
@@ -151,6 +172,15 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         order.setStatus(request.status());
+        orderEventService.saveEvent(
+                order.getId(),
+                OrderEventType.ORDER_STATUS_UPDATED,
+                "Order status updated to " + request.status().name(),
+                order.getStatus().name(),
+                null,
+                null,
+                order.getUser().getId()
+        );
 
         return OrderMapper.toResponse(order);
     }

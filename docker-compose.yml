@@ -12,5 +12,13 @@ services:
     volumes:
       - reycom_postgres_data:/var/lib/postgresql/data
 
+  dynamodb:
+    image: amazon/dynamodb-local
+    container_name: reycom-dynamodb
+    restart: unless-stopped
+    command: "-jar DynamoDBLocal.jar -sharedDb"
+    ports:
+      - "8000:8000"
+
 volumes:
   reycom_postgres_data:
