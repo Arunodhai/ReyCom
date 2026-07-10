@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReyCom API Console</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="mark">R</div>
+            <div>
+                <h1>ReyCom</h1>
+                <p>API Console</p>
+            </div>
+        </div>
+
+        <nav class="nav">
+            <button class="nav-item active" data-view="auth">Auth</button>
+            <button class="nav-item" data-view="catalog">Catalog</button>
+            <button class="nav-item" data-view="inventory">Inventory</button>
+            <button class="nav-item" data-view="cart">Cart</button>
+            <button class="nav-item" data-view="orders">Orders</button>
+            <button class="nav-item" data-view="payments">Payments</button>
+            <button class="nav-item" data-view="admin">Admin</button>
+        </nav>
+
+        <div class="session-card">
+            <span class="label">Session</span>
+            <strong id="sessionUser">Not signed in</strong>
+            <span id="sessionRole" class="pill muted">No token</span>
+            <button id="logoutBtn" class="secondary full">Clear token</button>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <h2 id="viewTitle">Auth</h2>
+                <p id="viewSubtitle">Register, login, and store the bearer token for API testing.</p>
+            </div>
+            <div class="api-base">
+                <label for="apiBase">API base</label>
+                <input id="apiBase" value="" placeholder="same origin">
+            </div>
+        </header>
+
+        <section id="auth" class="view active">
+            <div class="grid two">
+                <form class="panel" id="loginForm">
+                    <div class="panel-head">
+                        <h3>Login</h3>
+                        <button type="submit">Login</button>
+                    </div>
+                    <label>Email<input name="email" type="email" value="user@test.com" required></label>
+                    <label>Password<input name="password" type="password" value="password123" required></label>
+                </form>
+
+                <form class="panel" id="registerForm">
+                    <div class="panel-head">
+                        <h3>Register Customer</h3>
+                        <button type="submit">Register</button>
+                    </div>
+                    <label>Full name<input name="fullName" value="Test User" required></label>
+                    <label>Email<input name="email" type="email" value="user@test.com" required></label>
+                    <label>Password<input name="password" type="password" value="password123" required></label>
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Current User</h3>
+                    <button id="meBtn" class="secondary">Fetch /me</button>
+                </div>
+                <div id="meBox" class="empty">No user loaded.</div>
+            </div>
+        </section>
+
+        <section id="catalog" class="view">
+            <div class="grid two">
+                <form class="panel" id="categoryForm">
+                    <div class="panel-head">
+                        <h3>Create Category</h3>
+                        <button type="submit">Create</button>
+                    </div>
+                    <label>Name<input name="name" value="Electronics" required></label>
+                    <label>Description<textarea name="description">Devices and accessories</textarea></label>
+                </form>
+
+                <form class="panel" id="productForm">
+                    <div class="panel-head">
+                        <h3>Create Product</h3>
+                        <button type="submit">Create</button>
+                    </div>
+                    <label>Name<input name="name" value="Wireless Keyboard" required></label>
+                    <label>Description<textarea name="description">Compact keyboard for testing orders</textarea></label>
+                    <div class="fields">
+                        <label>Price<input name="price" type="number" min="0.01" step="0.01" value="1499.00" required></label>
+                        <label>SKU<input name="sku" value="KEY-TEST-001" required></label>
+                    </div>
+                    <label>Image URL<input name="imageUrl" value=""></label>
+                    <label>Category ID<input name="categoryId" id="productCategoryId" placeholder="paste or select below" required></label>
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Products & Categories</h3>
+                    <div class="actions">
+                        <button id="refreshCategoriesBtn" class="secondary">Categories</button>
+                        <button id="refreshProductsBtn" class="secondary">Products</button>
+                    </div>
+                </div>
+                <div class="split">
+                    <div>
+                        <h4>Categories</h4>
+                        <div id="categoriesBox" class="list"></div>
+                    </div>
+                    <div>
+                        <h4>Products</h4>
+                        <div id="productsBox" class="list"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="inventory" class="view">
+            <div class="grid two">
+                <form class="panel" id="inventoryForm">
+                    <div class="panel-head">
+                        <h3>Create Inventory</h3>
+                        <button type="submit">Create</button>
+                    </div>
+                    <label>Product ID<input name="productId" id="inventoryProductId" required></label>
+                    <div class="fields">
+                        <label>Available<input name="quantityAvailable" type="number" min="0" value="25" required></label>
+                        <label>Reserved<input name="reservedQuantity" type="number" min="0" value="0" required></label>
+                        <label>Low stock<input name="lowStockThreshold" type="number" min="0" value="5" required></label>
+                    </div>
+                </form>
+
+                <form class="panel" id="inventoryUpdateForm">
+                    <div class="panel-head">
+                        <h3>Update Inventory</h3>
+                        <button type="submit">Update</button>
+                    </div>
+                    <label>Product ID<input name="productId" id="inventoryUpdateProductId" required></label>
+                    <div class="fields">
+                        <label>Available<input name="quantityAvailable" type="number" min="0" value="20" required></label>
+                        <label>Reserved<input name="reservedQuantity" type="number" min="0" value="0" required></label>
+                        <label>Low stock<input name="lowStockThreshold" type="number" min="0" value="5" required></label>
+                    </div>
+                </form>
+            </div>
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Inventory</h3>
+                    <button id="refreshInventoryBtn" class="secondary">Refresh</button>
+                </div>
+                <div id="inventoryBox" class="table-wrap"></div>
+            </div>
+        </section>
+
+        <section id="cart" class="view">
+            <div class="grid two">
+                <form class="panel" id="addCartForm">
+                    <div class="panel-head">
+                        <h3>Add Item</h3>
+                        <button type="submit">Add</button>
+                    </div>
+                    <label>Product ID<input name="productId" id="cartProductId" required></label>
+                    <label>Quantity<input name="quantity" type="number" min="1" value="1" required></label>
+                </form>
+
+                <form class="panel" id="updateCartForm">
+                    <div class="panel-head">
+                        <h3>Update Item</h3>
+                        <button type="submit">Update</button>
+                    </div>
+                    <label>Item ID<input name="itemId" id="cartItemId" required></label>
+                    <label>Quantity<input name="quantity" type="number" min="1" value="2" required></label>
+                </form>
+            </div>
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Cart</h3>
+                    <div class="actions">
+                        <button id="refreshCartBtn" class="secondary">Refresh</button>
+                        <button id="removeCartItemBtn" class="secondary danger">Remove item</button>
+                        <button id="clearCartBtn" class="secondary danger">Clear</button>
+                    </div>
+                </div>
+                <div id="cartBox" class="empty">Cart not loaded.</div>
+            </div>
+        </section>
+
+        <section id="orders" class="view">
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Customer Orders</h3>
+                    <div class="actions">
+                        <button id="createOrderBtn">Place order from cart</button>
+                        <button id="refreshOrdersBtn" class="secondary">Refresh</button>
+                    </div>
+                </div>
+                <label>Selected Order ID<input id="selectedOrderId" placeholder="select from list or paste"></label>
+                <div class="actions row">
+                    <button id="fetchOrderBtn" class="secondary">Fetch selected</button>
+                    <button id="cancelOrderBtn" class="secondary danger">Cancel selected</button>
+                </div>
+                <div id="ordersBox" class="list"></div>
+            </div>
+        </section>
+
+        <section id="payments" class="view">
+            <div class="grid two">
+                <form class="panel" id="initPaymentForm">
+                    <div class="panel-head">
+                        <h3>Initiate Payment</h3>
+                        <button type="submit">Initiate</button>
+                    </div>
+                    <label>Order ID<input name="orderId" id="paymentOrderId" required></label>
+                    <label>Method
+                        <select name="paymentMethod">
+                            <option>UPI</option>
+                            <option>CARD</option>
+                            <option>NET_BANKING</option>
+                            <option>CASH_ON_DELIVERY</option>
+                            <option>WALLET</option>
+                        </select>
+                    </label>
+                </form>
+
+                <form class="panel" id="failPaymentForm">
+                    <div class="panel-head">
+                        <h3>Fail Payment</h3>
+                        <button type="submit" class="danger-btn">Fail</button>
+                    </div>
+                    <label>Payment ID<input name="paymentId" id="selectedPaymentId" required></label>
+                    <label>Failure reason<textarea name="failureReason" required>Bank declined transaction</textarea></label>
+                </form>
+            </div>
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Payments</h3>
+                    <div class="actions">
+                        <button id="refreshPaymentsBtn" class="secondary">Refresh</button>
+                        <button id="successPaymentBtn">Mark success</button>
+                    </div>
+                </div>
+                <div id="paymentsBox" class="list"></div>
+            </div>
+        </section>
+
+        <section id="admin" class="view">
+            <div class="grid two">
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Admin Orders</h3>
+                        <button id="refreshAdminOrdersBtn" class="secondary">Refresh</button>
+                    </div>
+                    <label>Order ID<input id="adminOrderId"></label>
+                    <label>Status
+                        <select id="adminOrderStatus">
+                            <option>CREATED</option>
+                            <option>CONFIRMED</option>
+                            <option>PAYMENT_PENDING</option>
+                            <option>PAID</option>
+                            <option>CANCELLED</option>
+                            <option>SHIPPED</option>
+                            <option>DELIVERED</option>
+                            <option>FAILED</option>
+                        </select>
+                    </label>
+                    <button id="updateOrderStatusBtn">Update status</button>
+                    <div id="adminOrdersBox" class="list"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h3>Admin Payments</h3>
+                        <button id="refreshAdminPaymentsBtn" class="secondary">Refresh</button>
+                    </div>
+                    <div id="adminPaymentsBox" class="list"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="console">
+            <div class="panel-head">
+                <h3>Last Response</h3>
+                <button id="clearLogBtn" class="secondary">Clear</button>
+            </div>
+            <pre id="responseLog">{}</pre>
+        </section>
+    </main>
+</div>
+<script src="./app.js"></script>
+</body>
+</html>

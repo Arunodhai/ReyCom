@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:reycom_test_db;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  sql:
+    init:
+      mode: never
+
+reycom:
+  security:
+    jwt:
+      secret: reycom-test-secret-key-for-integration-tests-change-me
+      expiration-ms: 86400000
