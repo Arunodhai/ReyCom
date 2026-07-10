@@ -1,6 +1,7 @@
 package com.reydark.reycom.service.impl;
 
 import com.reydark.reycom.dto.request.CategoryRequest;
+import com.reydark.reycom.dto.response.CachedCategoryList;
 import com.reydark.reycom.dto.response.CategoryResponse;
 import com.reydark.reycom.entity.Category;
 import com.reydark.reycom.exception.BadRequestException;
@@ -10,6 +11,11 @@ import com.reydark.reycom.repository.CategoryRepository;
 import com.reydark.reycom.repository.ProductRepository;
 import com.reydark.reycom.service.CategoryService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,14 +23,21 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private final CacheManager cacheManager;
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "categories", allEntries = true),
+            @CacheEvict(cacheNames = "categoryDetails", allEntries = true),
+            @CacheEvict(cacheNames = "products", allEntries = true)
+    })
     public CategoryResponse create(CategoryRequest request) {
         String normalizedName = normalizeName(request.name());
 
@@ -42,6 +55,12 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "categories", allEntries = true),
+            @CacheEvict(cacheNames = "categoryDetails", allEntries = true),
+            @CacheEvict(cacheNames = "products", allEntries = true),
+            @CacheEvict(cacheNames = "productDetails", allEntries = true)
+    })
     public CategoryResponse update(UUID id, CategoryRequest request) {
         Category category = findCategory(id);
         String normalizedName = normalizeName(request.name());
@@ -59,6 +78,12 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "categories", allEntries = true),
+            @CacheEvict(cacheNames = "categoryDetails", allEntries = true),
+            @CacheEvict(cacheNames = "products", allEntries = true),
+            @CacheEvict(cacheNames = "productDetails", allEntries = true)
+    })
     public void delete(UUID id) {
         Category category = findCategory(id);
 
@@ -72,10 +97,30 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional(readOnly = true)
     public List<CategoryResponse> getAll() {
-        return categoryRepository.findAll()
+        Cache categoriesCache = cacheManager.getCache("categories");
+        if (categoriesCache != null) {
+            try {
+                CachedCategoryList cachedCategoryList = categoriesCache.get("all", CachedCategoryList.class);
+                if (cachedCategoryList != null) {
+                    return cachedCategoryList.categories();
+                }
+            } catch (RuntimeException ex) {
+                log.warn("Failed to read categories cache. Evicting stale entry.", ex);
+                categoriesCache.evict("all");
+            }
+        }
+
+        log.debug("Loading categories from PostgreSQL");
+        List<CategoryResponse> categories = categoryRepository.findAll()
                 .stream()
                 .map(CategoryMapper::toResponse)
                 .toList();
+
+        if (categoriesCache != null) {
+            categoriesCache.put("all", new CachedCategoryList(categories));
+        }
+
+        return categories;
     }
 
     private Category findCategory(UUID id) {

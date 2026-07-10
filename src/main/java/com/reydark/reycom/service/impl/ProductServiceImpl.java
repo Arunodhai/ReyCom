@@ -1,6 +1,7 @@
 package com.reydark.reycom.service.impl;
 
 import com.reydark.reycom.dto.request.ProductRequest;
+import com.reydark.reycom.dto.response.CachedProductPage;
 import com.reydark.reycom.dto.response.ProductResponse;
 import com.reydark.reycom.entity.Category;
 import com.reydark.reycom.entity.Product;
@@ -12,6 +13,12 @@ import com.reydark.reycom.repository.ProductRepository;
 import com.reydark.reycom.service.ProductService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +33,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
 
@@ -39,9 +47,14 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final CacheManager cacheManager;
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "products", allEntries = true),
+            @CacheEvict(cacheNames = "productDetails", allEntries = true)
+    })
     public ProductResponse create(ProductRequest request) {
         String normalizedSku = normalizeSku(request.sku());
 
@@ -65,6 +78,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "products", allEntries = true),
+            @CacheEvict(cacheNames = "productDetails", allEntries = true)
+    })
     public ProductResponse update(UUID id, ProductRequest request) {
         Product product = findProduct(id);
         String normalizedSku = normalizeSku(request.sku());
@@ -86,6 +103,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "products", allEntries = true),
+            @CacheEvict(cacheNames = "productDetails", allEntries = true)
+    })
     public void delete(UUID id) {
         Product product = findProduct(id);
         product.setActive(false);
@@ -93,7 +114,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "productDetails", key = "#id.toString()")
     public ProductResponse getById(UUID id) {
+        log.debug("Loading product {} from PostgreSQL", id);
         Product product = productRepository.findOne(activeProducts().and(hasId(id)))
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
         return ProductMapper.toResponse(product);
@@ -109,18 +132,60 @@ public class ProductServiceImpl implements ProductService {
             String search,
             UUID categoryId
     ) {
+        int normalizedPage = normalizePage(page);
+        int normalizedSize = normalizeSize(size);
+        String normalizedSortBy = normalizeSortBy(sortBy);
+        String normalizedSortDir = normalizeSortDir(sortDir);
+        String normalizedSearch = normalizeSearch(search);
+        String productListCacheKey = productListCacheKey(
+                normalizedPage,
+                normalizedSize,
+                normalizedSortBy,
+                normalizedSortDir,
+                normalizedSearch,
+                categoryId
+        );
+
+        Cache productsCache = cacheManager.getCache("products");
+        if (productsCache != null) {
+            try {
+                CachedProductPage cachedProductPage = productsCache.get(productListCacheKey, CachedProductPage.class);
+                if (cachedProductPage != null) {
+                    return cachedProductPage.toPage();
+                }
+            } catch (RuntimeException ex) {
+                log.warn("Failed to read products cache key {}. Evicting stale entry.", productListCacheKey, ex);
+                productsCache.evict(productListCacheKey);
+            }
+        }
+
+        log.debug(
+                "Loading products from PostgreSQL page={}, size={}, sortBy={}, sortDir={}, search={}, categoryId={}",
+                normalizedPage,
+                normalizedSize,
+                normalizedSortBy,
+                normalizedSortDir,
+                normalizedSearch,
+                categoryId
+        );
         Pageable pageable = PageRequest.of(
-                normalizePage(page),
-                normalizeSize(size),
-                buildSort(sortBy, sortDir)
+                normalizedPage,
+                normalizedSize,
+                buildSort(normalizedSortBy, normalizedSortDir)
         );
 
         Specification<Product> specification = activeProducts()
-                .and(nameContains(search))
+                .and(nameContains(normalizedSearch))
                 .and(categoryEquals(categoryId));
 
-        return productRepository.findAll(specification, pageable)
+        Page<ProductResponse> productPage = productRepository.findAll(specification, pageable)
                 .map(ProductMapper::toResponse);
+
+        if (productsCache != null) {
+            productsCache.put(productListCacheKey, CachedProductPage.from(productPage, normalizedSortBy, normalizedSortDir));
+        }
+
+        return productPage;
     }
 
     private Product findProduct(UUID id) {
@@ -167,13 +232,15 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private Sort buildSort(String sortBy, String sortDir) {
-        String field = sortBy == null || sortBy.isBlank() ? "createdAt" : sortBy.trim();
+        String field = normalizeSortBy(sortBy);
 
         if (!ALLOWED_SORT_FIELDS.contains(field)) {
             throw new BadRequestException("Unsupported sort field: " + field);
         }
 
-        Sort.Direction direction = "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort.Direction direction = "asc".equalsIgnoreCase(normalizeSortDir(sortDir))
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
         return Sort.by(direction, field);
     }
 
@@ -186,6 +253,30 @@ public class ProductServiceImpl implements ProductService {
             return 10;
         }
         return Math.min(size, 100);
+    }
+
+    private String normalizeSortBy(String sortBy) {
+        return sortBy == null || sortBy.isBlank() ? "createdAt" : sortBy.trim();
+    }
+
+    private String normalizeSortDir(String sortDir) {
+        return sortDir == null || sortDir.isBlank() ? "desc" : sortDir.trim().toLowerCase();
+    }
+
+    private String normalizeSearch(String search) {
+        return search == null ? "" : search.trim().toLowerCase();
+    }
+
+    private String productListCacheKey(
+            int page,
+            int size,
+            String sortBy,
+            String sortDir,
+            String search,
+            UUID categoryId
+    ) {
+        return "page=%d:size=%d:sortBy=%s:sortDir=%s:search=%s:categoryId=%s"
+                .formatted(page, size, sortBy, sortDir, search, categoryId == null ? "all" : categoryId);
     }
 
     private String normalizeSku(String sku) {

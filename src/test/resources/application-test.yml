@@ -1,4 +1,10 @@
 spring:
+  cache:
+    type: simple
+  data:
+    redis:
+      repositories:
+        enabled: false
   datasource:
     url: jdbc:h2:mem:reycom_test_db;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     username: sa

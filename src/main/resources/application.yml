@@ -3,6 +3,14 @@ spring:
     name: reycom
   profiles:
     active: dev
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
+  cache:
+    type: redis
 
 server:
   port: 8080
@@ -19,6 +27,13 @@ aws:
     enabled: ${AWS_DYNAMODB_ENABLED:true}
     endpoint: ${AWS_DYNAMODB_ENDPOINT:http://localhost:8000}
     table-name: ${AWS_DYNAMODB_TABLE_NAME:reycom_order_events}
+
+reycom-cache:
+  ttl:
+    products: 10m
+    product-details: 10m
+    categories: 30m
+    category-details: 30m
 
 ---
 
