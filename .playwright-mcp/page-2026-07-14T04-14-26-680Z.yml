@@ -1,0 +1,79 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: R
+      - generic [ref=e6]:
+        - heading "ReyCom" [level=1] [ref=e7]
+        - paragraph [ref=e8]: API Console
+    - navigation [ref=e9]:
+      - button "Auth" [ref=e10] [cursor=pointer]
+      - button "Catalog" [ref=e11] [cursor=pointer]
+      - button "Inventory" [ref=e12] [cursor=pointer]
+      - button "Cart" [ref=e13] [cursor=pointer]
+      - button "Orders" [ref=e14] [cursor=pointer]
+      - button "Payments" [ref=e15] [cursor=pointer]
+      - button "Notifications" [ref=e16] [cursor=pointer]
+      - button "Admin" [ref=e17] [cursor=pointer]
+    - generic [ref=e18]:
+      - generic [ref=e19]: Session
+      - strong [ref=e20]: Not signed in
+      - generic [ref=e21]: No token
+      - button "Clear token" [ref=e22] [cursor=pointer]
+  - main [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - heading "Auth" [level=2] [ref=e26]
+        - paragraph [ref=e27]: Register, login, and store the bearer token for API testing.
+      - generic [ref=e28]:
+        - generic [ref=e29]: API base
+        - textbox "API base" [ref=e30]:
+          - /placeholder: same origin or http://localhost:8080
+          - text: http://localhost:8080
+    - region "Selected testing IDs" [ref=e31]:
+      - generic [ref=e32]:
+        - generic [ref=e33]: Product
+        - strong [ref=e34]: None
+      - generic [ref=e35]:
+        - generic [ref=e36]: Cart item
+        - strong [ref=e37]: None
+      - generic [ref=e38]:
+        - generic [ref=e39]: Order
+        - strong [ref=e40]: None
+      - generic [ref=e41]:
+        - generic [ref=e42]: Payment
+        - strong [ref=e43]: None
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - heading "Login" [level=3] [ref=e48]
+            - button "Login" [ref=e49] [cursor=pointer]
+          - generic [ref=e50]:
+            - text: Email
+            - textbox "Email" [ref=e51]: user@test.com
+          - generic [ref=e52]:
+            - text: Password
+            - textbox "Password" [ref=e53]: password123
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - heading "Register Customer" [level=3] [ref=e56]
+            - button "Register" [ref=e57] [cursor=pointer]
+          - generic [ref=e58]:
+            - text: Full name
+            - textbox "Full name" [ref=e59]: Test User
+          - generic [ref=e60]:
+            - text: Email
+            - textbox "Email" [ref=e61]: user@test.com
+          - generic [ref=e62]:
+            - text: Password
+            - textbox "Password" [ref=e63]: password123
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - heading "Current User" [level=3] [ref=e66]
+          - button "Fetch /me" [ref=e67] [cursor=pointer]
+        - generic [ref=e68]: No user loaded.
+    - generic [ref=e69]:
+      - generic [ref=e70]:
+        - heading "Last Response" [level=3] [ref=e71]
+        - button "Clear" [ref=e72] [cursor=pointer]
+      - generic [ref=e73]: "{}"

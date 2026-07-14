@@ -17,6 +17,10 @@ const titles = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
+function configuredApiBase() {
+  return window.REYCOM_CONFIG?.apiBaseUrl || "";
+}
+
 function apiBase() {
   return $("#apiBase").value.trim().replace(/\/$/, "");
 }
@@ -472,6 +476,7 @@ function bindDelegates() {
 }
 
 function init() {
+  $("#apiBase").value = configuredApiBase();
   renderSession();
   updateSelectedBar();
   bindNavigation();
