@@ -10,6 +10,7 @@ const titles = {
   cart: ["Cart", "Add products, adjust quantities, and prepare a checkout cart."],
   orders: ["Orders", "Create orders from the current cart and test cancellation."],
   payments: ["Payments", "Simulate payment initiation, success, failure, and retry."],
+  notifications: ["Notifications", "Review async Kafka notifications for the current customer."],
   admin: ["Admin", "Inspect all orders/payments and update order status."],
 };
 
@@ -79,6 +80,18 @@ function log(value, ok) {
   $("#responseLog").className = ok ? "ok" : "bad";
 }
 
+function shortId(value) {
+  if (!value) return "None";
+  return value.length > 13 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
+}
+
+function updateSelectedBar() {
+  $("#selectedProductChip").textContent = shortId($("#cartProductId")?.value || $("#inventoryProductId")?.value);
+  $("#selectedCartItemChip").textContent = shortId($("#cartItemId")?.value);
+  $("#selectedOrderChip").textContent = shortId($("#selectedOrderId")?.value || $("#paymentOrderId")?.value || $("#adminOrderId")?.value);
+  $("#selectedPaymentChip").textContent = shortId($("#selectedPaymentId")?.value);
+}
+
 function renderSession() {
   const user = state.user;
   $("#sessionUser").textContent = user ? user.email : "Not signed in";
@@ -104,7 +117,7 @@ function clearAuth() {
 
 function itemCard(title, meta = [], actions = []) {
   const actionHtml = actions.map((action) =>
-    `<button class="secondary" data-action="${action.action}" data-id="${action.id}">${action.label}</button>`
+    `<button class="secondary mini" data-action="${action.action}" data-id="${action.id}">${action.label}</button>`
   ).join("");
   return `
     <div class="item">
@@ -208,6 +221,21 @@ function renderOrders(selector, orders, admin) {
 async function refreshPayments() {
   const result = await api("/api/payments");
   renderPayments("#paymentsBox", result.data || []);
+}
+
+async function refreshNotifications() {
+  const result = await api("/api/notifications");
+  const notifications = result.data || [];
+  $("#notificationsBox").innerHTML = notifications.length ? notifications.map((notification) => itemCard(
+    `${notification.title}${notification.read ? "" : " · Unread"}`,
+    [
+      notification.message,
+      `Type: ${notification.eventType}`,
+      `Reference: ${notification.referenceId}`,
+      `Created: ${notification.createdAt}`,
+    ],
+    [{ label: "Select", action: "use-notification", id: notification.id }]
+  )).join("") : `<div class="empty">No notifications found.</div>`;
 }
 
 async function refreshAdminPayments() {
@@ -348,6 +376,12 @@ function bindButtons() {
     run(() => api(`/api/orders/${orderId}/cancel`, { method: "POST" }), { refresh: refreshOrders });
   });
   $("#refreshPaymentsBtn").addEventListener("click", () => run(refreshPayments));
+  $("#refreshNotificationsBtn").addEventListener("click", () => run(refreshNotifications));
+  $("#markNotificationReadBtn").addEventListener("click", () => {
+    const notificationId = $("#selectedNotificationId").value.trim();
+    if (!notificationId) return log({ success: false, message: "Select or enter a notification ID" }, false);
+    run(() => api(`/api/notifications/${notificationId}/read`, { method: "PUT" }), { refresh: refreshNotifications });
+  });
   $("#successPaymentBtn").addEventListener("click", () => {
     const paymentId = $("#selectedPaymentId").value.trim();
     if (!paymentId) return log({ success: false, message: "Select or enter a payment ID" }, false);
@@ -380,6 +414,7 @@ function bindNavigation() {
       const [title, subtitle] = titles[button.dataset.view];
       $("#viewTitle").textContent = title;
       $("#viewSubtitle").textContent = subtitle;
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
   });
 }
@@ -390,21 +425,55 @@ function bindDelegates() {
     if (!button) return;
     const { action, id } = button.dataset;
     if (action === "use-category") $("#productCategoryId").value = id;
-    if (action === "use-product-cart") $("#cartProductId").value = id;
-    if (action === "use-product-inventory") {
+    if (action === "use-product-cart") {
+      $("#cartProductId").value = id;
       $("#inventoryProductId").value = id;
       $("#inventoryUpdateProductId").value = id;
     }
+    if (action === "use-product-inventory") {
+      $("#inventoryProductId").value = id;
+      $("#inventoryUpdateProductId").value = id;
+      $("#cartProductId").value = id;
+    }
     if (action === "use-cart-item") $("#cartItemId").value = id;
-    if (action === "use-order") $("#selectedOrderId").value = id;
-    if (action === "use-admin-order") $("#adminOrderId").value = id;
-    if (action === "use-order-payment") $("#paymentOrderId").value = id;
+    if (action === "use-order") {
+      $("#selectedOrderId").value = id;
+      $("#paymentOrderId").value = id;
+    }
+    if (action === "use-admin-order") {
+      $("#adminOrderId").value = id;
+      $("#selectedOrderId").value = id;
+      $("#paymentOrderId").value = id;
+    }
+    if (action === "use-order-payment") {
+      $("#paymentOrderId").value = id;
+      $("#selectedOrderId").value = id;
+      $("#adminOrderId").value = id;
+    }
     if (action === "use-payment") $("#selectedPaymentId").value = id;
+    if (action === "use-notification") $("#selectedNotificationId").value = id;
+    updateSelectedBar();
+  });
+
+  [
+    "#cartProductId",
+    "#inventoryProductId",
+    "#inventoryUpdateProductId",
+    "#cartItemId",
+    "#selectedOrderId",
+    "#paymentOrderId",
+    "#adminOrderId",
+    "#selectedPaymentId",
+    "#selectedNotificationId",
+  ].forEach((selector) => {
+    const input = $(selector);
+    if (input) input.addEventListener("input", updateSelectedBar);
   });
 }
 
 function init() {
   renderSession();
+  updateSelectedBar();
   bindNavigation();
   bindForms();
   bindButtons();

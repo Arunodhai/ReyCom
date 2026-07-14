@@ -1,6 +1,9 @@
 spring:
   cache:
     type: simple
+  kafka:
+    listener:
+      auto-startup: false
   data:
     redis:
       repositories:
@@ -22,6 +25,8 @@ spring:
       mode: never
 
 reycom:
+  kafka:
+    enabled: false
   security:
     jwt:
       secret: reycom-test-secret-key-for-integration-tests-change-me

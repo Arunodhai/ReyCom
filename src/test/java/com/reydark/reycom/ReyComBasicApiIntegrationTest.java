@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.reydark.reycom.entity.User;
 import com.reydark.reycom.enums.Role;
+import com.reydark.reycom.event.OrderEventMessage;
 import com.reydark.reycom.repository.UserRepository;
+import com.reydark.reycom.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -15,6 +17,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +41,9 @@ class ReyComBasicApiIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @Test
     void shouldRegisterAndLoginUser() throws Exception {
@@ -186,6 +193,52 @@ class ReyComBasicApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].status").value("PAID"));
+    }
+
+    @Test
+    void shouldCreateAndReadCurrentUserNotification() throws Exception {
+        String customerEmail = uniqueEmail("notification-customer");
+
+        // Step 1: Register and login as a customer.
+        postJson("/api/auth/register", """
+                {
+                  "fullName": "Notification Customer",
+                  "email": "%s",
+                  "password": "password123"
+                }
+                """.formatted(customerEmail))
+                .andExpect(status().isCreated());
+
+        String customerToken = loginAndExtractToken(customerEmail);
+        User customer = userRepository.findByEmail(customerEmail).orElseThrow();
+
+        // Step 2: Simulate a consumed Kafka order event by calling the notification service directly.
+        notificationService.createNotificationFromOrderEvent(OrderEventMessage.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType("ORDER_CREATED")
+                .orderId(UUID.randomUUID().toString())
+                .orderNumber("ORD-TEST-001")
+                .userId(customer.getId().toString())
+                .orderStatus("PAYMENT_PENDING")
+                .totalAmount(BigDecimal.valueOf(1499.00))
+                .occurredAt(Instant.now().toString())
+                .message("Order created successfully")
+                .build());
+
+        // Step 3: Fetch notifications through the authenticated customer API.
+        MvcResult notificationsResult = getJson("/api/notifications", customerToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].title").value("Order Created"))
+                .andExpect(jsonPath("$.data[0].read").value(false))
+                .andReturn();
+
+        String notificationId = extractStringFromJson(notificationsResult, "/data/0/id");
+
+        // Step 4: Mark the notification as read. The API only allows the owner to update it.
+        putJson("/api/notifications/" + notificationId + "/read", customerToken, "{}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.read").value(true));
     }
 
     private String loginAndExtractToken(String email) throws Exception {

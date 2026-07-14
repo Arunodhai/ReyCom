@@ -24,6 +24,7 @@
             <button class="nav-item" data-view="cart">Cart</button>
             <button class="nav-item" data-view="orders">Orders</button>
             <button class="nav-item" data-view="payments">Payments</button>
+            <button class="nav-item" data-view="notifications">Notifications</button>
             <button class="nav-item" data-view="admin">Admin</button>
         </nav>
 
@@ -46,6 +47,25 @@
                 <input id="apiBase" value="" placeholder="same origin">
             </div>
         </header>
+
+        <section class="selection-bar" aria-label="Selected testing IDs">
+            <div>
+                <span class="label">Product</span>
+                <strong id="selectedProductChip">None</strong>
+            </div>
+            <div>
+                <span class="label">Cart item</span>
+                <strong id="selectedCartItemChip">None</strong>
+            </div>
+            <div>
+                <span class="label">Order</span>
+                <strong id="selectedOrderChip">None</strong>
+            </div>
+            <div>
+                <span class="label">Payment</span>
+                <strong id="selectedPaymentChip">None</strong>
+            </div>
+        </section>
 
         <section id="auth" class="view active">
             <div class="grid two">
@@ -253,6 +273,23 @@
                     </div>
                 </div>
                 <div id="paymentsBox" class="list"></div>
+            </div>
+        </section>
+
+        <section id="notifications" class="view">
+            <div class="panel hero-panel">
+                <div>
+                    <h3>Customer Notifications</h3>
+                    <p>Kafka consumers create these records after order and payment events.</p>
+                </div>
+                <div class="actions">
+                    <button id="refreshNotificationsBtn">Refresh notifications</button>
+                    <button id="markNotificationReadBtn" class="secondary">Mark selected read</button>
+                </div>
+            </div>
+            <div class="panel">
+                <label>Selected Notification ID<input id="selectedNotificationId" placeholder="select from list or paste"></label>
+                <div id="notificationsBox" class="list"></div>
             </div>
         </section>
 

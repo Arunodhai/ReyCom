@@ -10,6 +10,8 @@ import com.reydark.reycom.entity.OrderItem;
 import com.reydark.reycom.entity.User;
 import com.reydark.reycom.enums.OrderEventType;
 import com.reydark.reycom.enums.OrderStatus;
+import com.reydark.reycom.event.KafkaEventProducer;
+import com.reydark.reycom.event.OrderEventMessage;
 import com.reydark.reycom.exception.BadRequestException;
 import com.reydark.reycom.exception.ResourceNotFoundException;
 import com.reydark.reycom.exception.UnauthorizedException;
@@ -26,8 +28,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -49,6 +54,7 @@ public class OrderServiceImpl implements OrderService {
     private final InventoryRepository inventoryRepository;
     private final UserRepository userRepository;
     private final OrderEventService orderEventService;
+    private final KafkaEventProducer kafkaEventProducer;
 
     @Override
     @Transactional
@@ -104,6 +110,7 @@ public class OrderServiceImpl implements OrderService {
                 null,
                 user.getId()
         );
+        publishOrderEventAfterCommit(savedOrder, OrderEventType.ORDER_CREATED.name(), "Order created successfully");
 
         return OrderMapper.toResponse(savedOrder);
     }
@@ -149,6 +156,7 @@ public class OrderServiceImpl implements OrderService {
                 null,
                 user.getId()
         );
+        publishOrderEventAfterCommit(order, OrderEventType.ORDER_CANCELLED.name(), "Order cancelled successfully");
 
         return OrderMapper.toResponse(order);
     }
@@ -181,8 +189,39 @@ public class OrderServiceImpl implements OrderService {
                 null,
                 order.getUser().getId()
         );
+        publishOrderEventAfterCommit(order, OrderEventType.ORDER_STATUS_UPDATED.name(), "Order status updated to " + request.status().name());
 
         return OrderMapper.toResponse(order);
+    }
+
+    private void publishOrderEventAfterCommit(Order order, String eventType, String message) {
+        OrderEventMessage event = OrderEventMessage.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType(eventType)
+                .orderId(order.getId().toString())
+                .orderNumber(order.getOrderNumber())
+                .userId(order.getUser().getId().toString())
+                .orderStatus(order.getStatus().name())
+                .totalAmount(order.getTotalAmount())
+                .occurredAt(Instant.now().toString())
+                .message(message)
+                .build();
+
+        runAfterCommit(() -> kafkaEventProducer.publishOrderEvent(event));
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private User getCurrentUser() {

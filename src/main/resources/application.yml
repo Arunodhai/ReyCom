@@ -11,11 +11,31 @@ spring:
         enabled: false
   cache:
     type: redis
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        max.block.ms: 1000
+        request.timeout.ms: 1000
+        delivery.timeout.ms: 3000
+    consumer:
+      group-id: reycom-notification-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.reydark.reycom.event
+    listener:
+      missing-topics-fatal: false
 
 server:
   port: 8080
 
 reycom:
+  kafka:
+    enabled: ${REYCOM_KAFKA_ENABLED:true}
   security:
     jwt:
       secret: ${JWT_SECRET:reycom-local-development-secret-key-change-me-please}

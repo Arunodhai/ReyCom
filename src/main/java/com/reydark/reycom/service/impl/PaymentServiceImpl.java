@@ -9,6 +9,8 @@ import com.reydark.reycom.entity.User;
 import com.reydark.reycom.enums.OrderEventType;
 import com.reydark.reycom.enums.OrderStatus;
 import com.reydark.reycom.enums.PaymentStatus;
+import com.reydark.reycom.event.KafkaEventProducer;
+import com.reydark.reycom.event.PaymentEventMessage;
 import com.reydark.reycom.exception.BadRequestException;
 import com.reydark.reycom.exception.ResourceNotFoundException;
 import com.reydark.reycom.exception.UnauthorizedException;
@@ -24,7 +26,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -45,6 +50,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final OrderEventService orderEventService;
+    private final KafkaEventProducer kafkaEventProducer;
 
     @Override
     @Transactional
@@ -77,6 +83,7 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getId(),
                 user.getId()
         );
+        publishPaymentEventAfterCommit(payment, OrderEventType.PAYMENT_INITIATED.name(), "Payment initiated");
 
         return PaymentMapper.toResponse(payment);
     }
@@ -106,6 +113,7 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getId(),
                 user.getId()
         );
+        publishPaymentEventAfterCommit(payment, OrderEventType.PAYMENT_SUCCESS.name(), "Payment completed successfully");
 
         return PaymentMapper.toResponse(payment);
     }
@@ -135,6 +143,7 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getId(),
                 user.getId()
         );
+        publishPaymentEventAfterCommit(payment, OrderEventType.PAYMENT_FAILED.name(), "Payment failed");
 
         return PaymentMapper.toResponse(payment);
     }
@@ -215,5 +224,38 @@ public class PaymentServiceImpl implements PaymentService {
         } while (paymentRepository.existsByPaymentNumber(paymentNumber));
 
         return paymentNumber;
+    }
+
+    private void publishPaymentEventAfterCommit(Payment payment, String eventType, String message) {
+        PaymentEventMessage event = PaymentEventMessage.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType(eventType)
+                .paymentId(payment.getId().toString())
+                .paymentNumber(payment.getPaymentNumber())
+                .orderId(payment.getOrder().getId().toString())
+                .orderNumber(payment.getOrder().getOrderNumber())
+                .userId(payment.getUser().getId().toString())
+                .paymentStatus(payment.getStatus().name())
+                .orderStatus(payment.getOrder().getStatus().name())
+                .amount(payment.getAmount())
+                .occurredAt(Instant.now().toString())
+                .message(message)
+                .build();
+
+        runAfterCommit(() -> kafkaEventProducer.publishPaymentEvent(event));
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }
