@@ -1,5 +1,7 @@
 # ReyCom
 
+[![CI](https://github.com/Arunodhai/ReyCom/actions/workflows/ci.yml/badge.svg)](https://github.com/Arunodhai/ReyCom/actions/workflows/ci.yml)
+
 ReyCom is a Spring Boot e-commerce backend with a lightweight browser console for testing the APIs.
 
 ## Run Locally Without Docker
@@ -104,3 +106,16 @@ Run the API integration tests:
 ```
 
 Tests use the `test` profile with H2 and a simple cache manager. They do not require Docker, PostgreSQL, Redis, DynamoDB Local, or Kafka to be running.
+
+## Continuous Integration
+
+GitHub Actions runs CI for every push and pull request targeting `main` or `master`. The workflow:
+
+- runs the backend tests with Java 21 and Maven
+- builds the Spring Boot JAR
+- builds the ReyCom API Docker image
+- installs and builds the browser console with Node.js 20
+- builds the ReyCom Console Docker image
+- validates the Docker Compose configuration
+
+The workflow is defined in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Test failures and build logs are available from the repository's **Actions** tab.

@@ -1,6 +1,8 @@
 HELP.md
 target/
 .env
+console/dist/
+console/node_modules/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
