@@ -119,3 +119,24 @@ GitHub Actions runs CI for every push and pull request targeting `main` or `mast
 - validates the Docker Compose configuration
 
 The workflow is defined in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Test failures and build logs are available from the repository's **Actions** tab.
+
+## Publishing Backend Docker Image to AWS ECR
+
+The ECR publishing workflow runs when code is pushed to `main` or `master`. It can also be started manually from the repository's **Actions** tab by selecting **Publish Backend to ECR** and choosing **Run workflow**.
+
+Create the private ECR repository before running the workflow. `reycom-api` is the recommended repository name. Add these values under **Settings > Secrets and variables > Actions > Repository secrets**:
+
+| Secret | Purpose |
+| --- | --- |
+| `AWS_ACCESS_KEY_ID` | Access key for an IAM identity allowed to push to ECR |
+| `AWS_SECRET_ACCESS_KEY` | Secret key for the IAM identity |
+| `AWS_REGION` | Region containing the ECR repository, such as `ap-south-1` |
+| `AWS_ACCOUNT_ID` | AWS account that owns the ECR repository |
+| `ECR_REPOSITORY` | Existing ECR repository name, such as `reycom-api` |
+
+The workflow is defined in [`.github/workflows/ecr-publish.yml`](.github/workflows/ecr-publish.yml). It runs the backend tests, builds the JAR, builds the backend Docker image, and pushes two tags:
+
+- `latest`
+- the full Git commit SHA, for example `a1b2c3d4...`
+
+To verify a published image, open **AWS Console > Elastic Container Registry > Private registry > Repositories**, select the configured repository, and check that both tags are listed under **Images**. AWS credentials are read only from GitHub repository secrets; do not add them to `.env` or commit them to the repository.
