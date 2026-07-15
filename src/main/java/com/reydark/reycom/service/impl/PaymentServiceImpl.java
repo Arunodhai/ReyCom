@@ -21,6 +21,7 @@ import com.reydark.reycom.repository.UserRepository;
 import com.reydark.reycom.security.UserPrincipal;
 import com.reydark.reycom.service.OrderEventService;
 import com.reydark.reycom.service.PaymentService;
+import com.reydark.reycom.service.ReyComMetricsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -51,6 +52,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final UserRepository userRepository;
     private final OrderEventService orderEventService;
     private final KafkaEventProducer kafkaEventProducer;
+    private final ReyComMetricsService metricsService;
 
     @Override
     @Transactional
@@ -83,6 +85,7 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getId(),
                 user.getId()
         );
+        metricsService.recordPaymentInitiated();
         publishPaymentEventAfterCommit(payment, OrderEventType.PAYMENT_INITIATED.name(), "Payment initiated");
 
         return PaymentMapper.toResponse(payment);
@@ -113,6 +116,7 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getId(),
                 user.getId()
         );
+        metricsService.recordPaymentSuccess();
         publishPaymentEventAfterCommit(payment, OrderEventType.PAYMENT_SUCCESS.name(), "Payment completed successfully");
 
         return PaymentMapper.toResponse(payment);
@@ -143,6 +147,7 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getId(),
                 user.getId()
         );
+        metricsService.recordPaymentFailed();
         publishPaymentEventAfterCommit(payment, OrderEventType.PAYMENT_FAILED.name(), "Payment failed");
 
         return PaymentMapper.toResponse(payment);

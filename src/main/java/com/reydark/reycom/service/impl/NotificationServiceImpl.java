@@ -12,6 +12,7 @@ import com.reydark.reycom.repository.NotificationRepository;
 import com.reydark.reycom.repository.UserRepository;
 import com.reydark.reycom.security.UserPrincipal;
 import com.reydark.reycom.service.NotificationService;
+import com.reydark.reycom.service.ReyComMetricsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -30,6 +31,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final ReyComMetricsService metricsService;
 
     @Override
     @Transactional
@@ -48,6 +50,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .referenceId(event.getOrderId())
                 .read(false)
                 .build());
+        metricsService.recordNotificationCreated();
     }
 
     @Override
@@ -67,6 +70,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .referenceId(event.getPaymentId())
                 .read(false)
                 .build());
+        metricsService.recordNotificationCreated();
     }
 
     @Override

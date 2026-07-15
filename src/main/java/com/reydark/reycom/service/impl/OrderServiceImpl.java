@@ -23,6 +23,7 @@ import com.reydark.reycom.repository.UserRepository;
 import com.reydark.reycom.security.UserPrincipal;
 import com.reydark.reycom.service.OrderEventService;
 import com.reydark.reycom.service.OrderService;
+import com.reydark.reycom.service.ReyComMetricsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -55,6 +56,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final OrderEventService orderEventService;
     private final KafkaEventProducer kafkaEventProducer;
+    private final ReyComMetricsService metricsService;
 
     @Override
     @Transactional
@@ -110,6 +112,7 @@ public class OrderServiceImpl implements OrderService {
                 null,
                 user.getId()
         );
+        metricsService.recordOrderCreated();
         publishOrderEventAfterCommit(savedOrder, OrderEventType.ORDER_CREATED.name(), "Order created successfully");
 
         return OrderMapper.toResponse(savedOrder);
@@ -156,6 +159,7 @@ public class OrderServiceImpl implements OrderService {
                 null,
                 user.getId()
         );
+        metricsService.recordOrderCancelled();
         publishOrderEventAfterCommit(order, OrderEventType.ORDER_CANCELLED.name(), "Order cancelled successfully");
 
         return OrderMapper.toResponse(order);

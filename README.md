@@ -140,3 +140,40 @@ The workflow is defined in [`.github/workflows/ecr-publish.yml`](.github/workflo
 - the full Git commit SHA, for example `a1b2c3d4...`
 
 To verify a published image, open **AWS Console > Elastic Container Registry > Private registry > Repositories**, select the configured repository, and check that both tags are listed under **Images**. AWS credentials are read only from GitHub repository secrets; do not add them to `.env` or commit them to the repository.
+
+## Monitoring
+
+Prometheus scrapes Spring Boot Actuator metrics from the ReyCom API, and Grafana reads those metrics from Prometheus. Start the complete local stack with:
+
+```bash
+docker compose up --build
+```
+
+Monitoring URLs:
+
+- ReyCom API health: http://localhost:8080/actuator/health
+- Prometheus metrics: http://localhost:8080/actuator/prometheus
+- Actuator metric names: http://localhost:8080/actuator/metrics
+- Prometheus UI: http://localhost:9090
+- Grafana: http://localhost:3001
+
+Grafana uses `admin` / `admin` by default. The username and password can be changed with `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD` in `.env`. Open **Dashboards > ReyCom > ReyCom Overview** to view API traffic, latency, errors, JVM health, and business counters.
+
+Custom counters:
+
+- `reycom.orders.created`
+- `reycom.orders.cancelled`
+- `reycom.payments.initiated`
+- `reycom.payments.success`
+- `reycom.payments.failed`
+- `reycom.notifications.created`
+
+Micrometer exposes counters in Prometheus format with underscores and a `_total` suffix. Prometheus reserves the `_created` suffix, so the logical meter `reycom.orders.created` is exported as `reycom_orders_total` (and `reycom.notifications.created` as `reycom_notifications_total`). Inspect the currently available names with:
+
+```bash
+curl -s http://localhost:8080/actuator/prometheus | grep '^reycom_'
+```
+
+To verify the business panels, use the ReyCom Console to create an order, initiate its payment, and mark the payment successful or failed. Refresh Grafana after the next Prometheus scrape, which occurs every 15 seconds. Kafka-created notifications update the notifications counter when their database transaction commits.
+
+The local monitoring configuration is stored under `monitoring/`. This phase does not add EC2 deployment automation: `.github/workflows/ci.yml` continues to test and build, while `.github/workflows/ecr-publish.yml` continues only to publish the backend image to ECR.
