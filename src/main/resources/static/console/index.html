@@ -8,48 +8,79 @@
     <script src="./env-config.js"></script>
 </head>
 <body>
+<a class="skip-link" href="#workspace">Skip to workspace</a>
 <div class="shell">
     <aside class="sidebar">
         <div class="brand">
-            <div class="mark">R</div>
+            <div class="mark" aria-hidden="true">R</div>
             <div>
                 <h1>ReyCom</h1>
-                <p>API Console</p>
+                <p>Developer console</p>
             </div>
         </div>
 
+        <p class="sidebar-kicker">API workflow</p>
         <nav class="nav">
-            <button class="nav-item active" data-view="auth">Auth</button>
-            <button class="nav-item" data-view="catalog">Catalog</button>
-            <button class="nav-item" data-view="inventory">Inventory</button>
-            <button class="nav-item" data-view="cart">Cart</button>
-            <button class="nav-item" data-view="orders">Orders</button>
-            <button class="nav-item" data-view="payments">Payments</button>
-            <button class="nav-item" data-view="notifications">Notifications</button>
-            <button class="nav-item" data-view="admin">Admin</button>
+            <button class="nav-item active" data-view="auth"><span>01</span>Auth</button>
+            <button class="nav-item" data-view="catalog"><span>02</span>Catalog</button>
+            <button class="nav-item" data-view="inventory"><span>03</span>Inventory</button>
+            <button class="nav-item" data-view="cart"><span>04</span>Cart</button>
+            <button class="nav-item" data-view="orders"><span>05</span>Orders</button>
+            <button class="nav-item" data-view="payments"><span>06</span>Payments</button>
+            <button class="nav-item" data-view="notifications"><span>07</span>Notifications</button>
+            <button class="nav-item" data-view="admin"><span>08</span>Admin</button>
         </nav>
 
         <div class="session-card">
-            <span class="label">Session</span>
+            <div class="session-label"><span class="status-dot" id="sessionDot"></span><span>Session</span></div>
             <strong id="sessionUser">Not signed in</strong>
             <span id="sessionRole" class="pill muted">No token</span>
+            <div class="quick-switch" aria-label="Quick account switch">
+                <button type="button" class="secondary" data-login-profile="admin">Admin</button>
+                <button type="button" class="secondary" data-login-profile="client">Client</button>
+            </div>
             <button id="logoutBtn" class="secondary full">Clear token</button>
         </div>
     </aside>
 
-    <main class="main">
+    <main class="main" id="workspace">
         <header class="topbar">
             <div>
+                <span class="eyebrow">ReyCom API workspace</span>
                 <h2 id="viewTitle">Auth</h2>
                 <p id="viewSubtitle">Register, login, and store the bearer token for API testing.</p>
             </div>
             <div class="api-base">
-                <label for="apiBase">API base</label>
-                <input id="apiBase" value="" placeholder="same origin or http://localhost:8080">
+                <label for="apiBase">API base URL</label>
+                <div class="input-action">
+                    <input id="apiBase" value="" placeholder="Same origin or http://localhost:8080" spellcheck="false">
+                    <button id="testConnectionBtn" class="secondary" type="button">Test</button>
+                </div>
+                <span class="connection-status" id="connectionStatus"><span class="status-dot"></span>Not checked</span>
             </div>
         </header>
 
+        <section class="workflow-card" aria-label="Suggested API testing workflow">
+            <div class="workflow-intro">
+                <span class="eyebrow">Suggested flow</span>
+                <strong>Test a complete purchase journey</strong>
+                <p>Your selected IDs carry forward automatically.</p>
+            </div>
+            <div class="workflow-steps">
+                <button class="workflow-step active" data-go-view="auth"><span>1</span>Sign in</button>
+                <button class="workflow-step" data-go-view="catalog"><span>2</span>Product</button>
+                <button class="workflow-step" data-go-view="inventory"><span>3</span>Stock</button>
+                <button class="workflow-step" data-go-view="cart"><span>4</span>Cart</button>
+                <button class="workflow-step" data-go-view="orders"><span>5</span>Order</button>
+                <button class="workflow-step" data-go-view="payments"><span>6</span>Pay</button>
+            </div>
+        </section>
+
         <section class="selection-bar" aria-label="Selected testing IDs">
+            <div class="selection-heading">
+                <span class="eyebrow">Test context</span>
+                <span>Selected response IDs are reused across forms</span>
+            </div>
             <div>
                 <span class="label">Product</span>
                 <strong id="selectedProductChip">None</strong>
@@ -69,19 +100,51 @@
         </section>
 
         <section id="auth" class="view active">
+            <div class="panel identity-panel">
+                <div class="panel-head">
+                    <div>
+                        <span class="eyebrow">One-time setup</span>
+                        <h3>Test identities</h3>
+                    </div>
+                    <button id="clearProfilesBtn" class="secondary danger" type="button">Clear saved credentials</button>
+                </div>
+                <p class="helper-text">Enter each password once. These demo credentials stay only in this browser, and the Admin/Client buttons let you switch sessions from anywhere in the console.</p>
+                <div class="identity-grid">
+                    <div class="identity-profile">
+                        <div class="identity-profile-head">
+                            <div class="identity-icon admin-icon" aria-hidden="true">A</div>
+                            <div><strong>Admin</strong><span>Catalog, inventory and operations</span></div>
+                        </div>
+                        <label>Email<input id="adminProfileEmail" data-profile="admin" data-profile-field="email" type="email" autocomplete="username" value="admin@reycom.local"></label>
+                        <label>Password<input id="adminProfilePassword" data-profile="admin" data-profile-field="password" type="password" autocomplete="current-password" placeholder="Enter once to enable quick login"></label>
+                        <button type="button" data-login-profile="admin">Login as Admin</button>
+                    </div>
+                    <div class="identity-profile">
+                        <div class="identity-profile-head">
+                            <div class="identity-icon client-icon" aria-hidden="true">C</div>
+                            <div><strong>Client</strong><span>Cart, orders, payments and notifications</span></div>
+                        </div>
+                        <label>Email<input id="clientProfileEmail" data-profile="client" data-profile-field="email" type="email" autocomplete="username" value="helen@reycom.local"></label>
+                        <label>Password<input id="clientProfilePassword" data-profile="client" data-profile-field="password" type="password" autocomplete="current-password" placeholder="Enter once to enable quick login"></label>
+                        <button type="button" data-login-profile="client">Login as Client</button>
+                    </div>
+                </div>
+                <div class="profile-status" id="profileStatus">Passwords are not configured yet.</div>
+            </div>
+
             <div class="grid two">
                 <form class="panel" id="loginForm">
                     <div class="panel-head">
-                        <h3>Login</h3>
+                        <div><span class="endpoint-tag post">POST</span><h3>Login</h3></div>
                         <button type="submit">Login</button>
                     </div>
-                    <label>Email<input name="email" type="email" value="user@test.com" required></label>
-                    <label>Password<input name="password" type="password" value="password123" required></label>
+                    <label>Email<input name="email" type="email" value="helen@reycom.local" autocomplete="username" required></label>
+                    <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
                 </form>
 
                 <form class="panel" id="registerForm">
                     <div class="panel-head">
-                        <h3>Register Customer</h3>
+                        <div><span class="endpoint-tag post">POST</span><h3>Register customer</h3></div>
                         <button type="submit">Register</button>
                     </div>
                     <label>Full name<input name="fullName" value="Test User" required></label>
@@ -103,7 +166,7 @@
             <div class="grid two">
                 <form class="panel" id="categoryForm">
                     <div class="panel-head">
-                        <h3>Create Category</h3>
+                        <div><span class="endpoint-tag post">POST</span><h3>Create category</h3></div>
                         <button type="submit">Create</button>
                     </div>
                     <label>Name<input name="name" value="Electronics" required></label>
@@ -112,7 +175,7 @@
 
                 <form class="panel" id="productForm">
                     <div class="panel-head">
-                        <h3>Create Product</h3>
+                        <div><span class="endpoint-tag post">POST</span><h3>Create product</h3></div>
                         <button type="submit">Create</button>
                     </div>
                     <label>Name<input name="name" value="Wireless Keyboard" required></label>
@@ -151,7 +214,7 @@
             <div class="grid two">
                 <form class="panel" id="inventoryForm">
                     <div class="panel-head">
-                        <h3>Create Inventory</h3>
+                        <div><span class="endpoint-tag post">POST</span><h3>Create inventory</h3></div>
                         <button type="submit">Create</button>
                     </div>
                     <label>Product ID<input name="productId" id="inventoryProductId" required></label>
@@ -164,7 +227,7 @@
 
                 <form class="panel" id="inventoryUpdateForm">
                     <div class="panel-head">
-                        <h3>Update Inventory</h3>
+                        <div><span class="endpoint-tag put">PUT</span><h3>Update inventory</h3></div>
                         <button type="submit">Update</button>
                     </div>
                     <label>Product ID<input name="productId" id="inventoryUpdateProductId" required></label>
@@ -188,7 +251,7 @@
             <div class="grid two">
                 <form class="panel" id="addCartForm">
                     <div class="panel-head">
-                        <h3>Add Item</h3>
+                        <div><span class="endpoint-tag post">POST</span><h3>Add item</h3></div>
                         <button type="submit">Add</button>
                     </div>
                     <label>Product ID<input name="productId" id="cartProductId" required></label>
@@ -197,7 +260,7 @@
 
                 <form class="panel" id="updateCartForm">
                     <div class="panel-head">
-                        <h3>Update Item</h3>
+                        <div><span class="endpoint-tag put">PUT</span><h3>Update item</h3></div>
                         <button type="submit">Update</button>
                     </div>
                     <label>Item ID<input name="itemId" id="cartItemId" required></label>
@@ -241,7 +304,7 @@
             <div class="grid two">
                 <form class="panel" id="initPaymentForm">
                     <div class="panel-head">
-                        <h3>Initiate Payment</h3>
+                        <div><span class="endpoint-tag post">POST</span><h3>Initiate payment</h3></div>
                         <button type="submit">Initiate</button>
                     </div>
                     <label>Order ID<input name="orderId" id="paymentOrderId" required></label>
@@ -258,7 +321,7 @@
 
                 <form class="panel" id="failPaymentForm">
                     <div class="panel-head">
-                        <h3>Fail Payment</h3>
+                        <div><span class="endpoint-tag post">POST</span><h3>Fail payment</h3></div>
                         <button type="submit" class="danger-btn">Fail</button>
                     </div>
                     <label>Payment ID<input name="paymentId" id="selectedPaymentId" required></label>
@@ -332,13 +395,26 @@
 
         <section class="console">
             <div class="panel-head">
-                <h3>Last Response</h3>
-                <button id="clearLogBtn" class="secondary">Clear</button>
+                <div>
+                    <span class="eyebrow">Inspector</span>
+                    <h3>Last response</h3>
+                </div>
+                <div class="actions">
+                    <button id="copyResponseBtn" class="secondary" type="button">Copy</button>
+                    <button id="clearLogBtn" class="secondary" type="button">Clear</button>
+                </div>
             </div>
-            <pre id="responseLog">{}</pre>
+            <div class="response-meta" id="responseMeta">
+                <span class="method-badge" id="responseMethod">—</span>
+                <code id="responsePath">No request yet</code>
+                <span class="response-stat" id="responseStatus">Idle</span>
+                <span class="response-time" id="responseTime">—</span>
+            </div>
+            <pre id="responseLog" tabindex="0">{}</pre>
         </section>
     </main>
 </div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="./app.js"></script>
 </body>
 </html>

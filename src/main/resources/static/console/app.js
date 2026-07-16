@@ -1,7 +1,30 @@
 const state = {
   token: localStorage.getItem("reycom.token") || "",
-  user: JSON.parse(localStorage.getItem("reycom.user") || "null"),
+  user: readStoredJson("reycom.user", null),
+  selections: readStoredJson("reycom.selections", {}),
+  testProfiles: readTestProfiles(),
+  activeControl: null,
 };
+
+const defaultTestProfiles = {
+  admin: { email: "admin@reycom.local", password: "" },
+  client: { email: "helen@reycom.local", password: "" },
+};
+
+const selectionFields = [
+  "productCategoryId",
+  "cartProductId",
+  "inventoryProductId",
+  "inventoryUpdateProductId",
+  "cartItemId",
+  "selectedOrderId",
+  "paymentOrderId",
+  "adminOrderId",
+  "selectedPaymentId",
+  "selectedNotificationId",
+];
+
+let toastTimer;
 
 const titles = {
   auth: ["Auth", "Register, login, and store the bearer token for API testing."],
@@ -17,8 +40,81 @@ const titles = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
+function readStoredJson(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+  } catch {
+    localStorage.removeItem(key);
+    return fallback;
+  }
+}
+
+function readTestProfiles() {
+  const stored = readStoredJson("reycom.testProfiles", {});
+  return {
+    admin: { email: stored.admin?.email || "admin@reycom.local", password: stored.admin?.password || "" },
+    client: { email: stored.client?.email || "helen@reycom.local", password: stored.client?.password || "" },
+  };
+}
+
+function persistTestProfiles() {
+  localStorage.setItem("reycom.testProfiles", JSON.stringify(state.testProfiles));
+  renderProfileStatus();
+}
+
+function renderTestProfiles() {
+  for (const profile of ["admin", "client"]) {
+    const email = document.querySelector(`[data-profile="${profile}"][data-profile-field="email"]`);
+    const password = document.querySelector(`[data-profile="${profile}"][data-profile-field="password"]`);
+    if (email) email.value = state.testProfiles[profile].email;
+    if (password) password.value = state.testProfiles[profile].password;
+  }
+  renderProfileStatus();
+}
+
+function renderProfileStatus() {
+  const ready = ["admin", "client"].filter((profile) => state.testProfiles[profile].email && state.testProfiles[profile].password);
+  const status = $("#profileStatus");
+  if (!status) return;
+  status.textContent = ready.length === 2
+    ? "Admin and Client quick login are ready."
+    : ready.length === 1
+      ? `${ready[0] === "admin" ? "Admin" : "Client"} quick login is ready. Add the other password when needed.`
+      : "Enter the two passwords once to enable quick login.";
+  status.classList.toggle("ready", ready.length === 2);
+}
+
+function rememberCredentials(credentials, role) {
+  const profile = role === "ADMIN" ? "admin" : "client";
+  state.testProfiles[profile] = { email: credentials.email, password: credentials.password };
+  persistTestProfiles();
+  renderTestProfiles();
+}
+
+async function loginWithProfile(profile) {
+  const credentials = state.testProfiles[profile];
+  if (!credentials?.email || !credentials?.password) {
+    navigateTo("auth");
+    const missingField = credentials?.email ? "password" : "email";
+    document.querySelector(`[data-profile="${profile}"][data-profile-field="${missingField}"]`)?.focus();
+    showToast(`Enter the ${profile} ${missingField} once to enable quick login`, true);
+    return;
+  }
+
+  await run(async () => {
+    const result = await api("/api/auth/login", { method: "POST", body: JSON.stringify(credentials) });
+    persistAuth(result.data);
+    showToast(`Switched to ${profile === "admin" ? "Admin" : "Client"}`);
+    return result;
+  });
+}
+
 function configuredApiBase() {
   return window.REYCOM_CONFIG?.apiBaseUrl || "";
+}
+
+function initialApiBase() {
+  return configuredApiBase() || localStorage.getItem("reycom.apiBase") || "";
 }
 
 function apiBase() {
@@ -33,18 +129,53 @@ function headers(hasBody = true) {
 }
 
 async function api(path, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
   const hasBody = options.body !== undefined;
-  const response = await fetch(`${apiBase()}${path}`, {
-    ...options,
-    headers: { ...headers(hasBody), ...(options.headers || {}) },
-  });
+  const startedAt = performance.now();
+  updateResponseMeta({ method, path, status: "Sending…", duration: "—" });
+
+  let response;
+  try {
+    response = await fetch(`${apiBase()}${path}`, {
+      ...options,
+      headers: { ...headers(hasBody), ...(options.headers || {}) },
+    });
+    setConnectionState("connected", "API reachable");
+  } catch (cause) {
+    const duration = `${Math.round(performance.now() - startedAt)} ms`;
+    updateResponseMeta({ method, path, status: "Network error", duration, ok: false });
+    setConnectionState("failed", "Connection failed");
+    const error = new Error("Could not reach the API. Check the base URL and server.", { cause });
+    error.logged = true;
+    log({ success: false, message: error.message }, false);
+    throw error;
+  }
 
   const text = await response.text();
-  let payload = text ? JSON.parse(text) : null;
+  let payload = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = { rawResponse: text };
+    }
+  }
+
+  const duration = `${Math.round(performance.now() - startedAt)} ms`;
+  updateResponseMeta({
+    method,
+    path,
+    status: `${response.status} ${response.statusText}`.trim(),
+    duration,
+    ok: response.ok,
+  });
+  log(payload, response.ok);
+
   if (!response.ok) {
     const error = new Error(payload?.message || `HTTP ${response.status}`);
     error.payload = payload;
     error.status = response.status;
+    error.logged = true;
     throw error;
   }
   return payload;
@@ -64,11 +195,12 @@ async function run(action, options = {}) {
   setBusy(true);
   try {
     const result = await action();
-    log(result, true);
     if (options.refresh) await options.refresh();
     return result;
   } catch (error) {
-    log(error.payload || { success: false, message: error.message, status: error.status }, false);
+    if (!error.logged) {
+      log(error.payload || { success: false, message: error.message, status: error.status }, false);
+    }
   } finally {
     setBusy(false);
     renderSession();
@@ -76,12 +208,67 @@ async function run(action, options = {}) {
 }
 
 function setBusy(busy) {
-  $$("button").forEach((button) => { button.disabled = busy; });
+  document.body.dataset.busy = String(busy);
+  if (busy) {
+    state.activeControl = document.activeElement?.closest?.("button") || null;
+    if (state.activeControl) {
+      state.activeControl.dataset.originalLabel = state.activeControl.textContent;
+      state.activeControl.textContent = "Working…";
+      state.activeControl.disabled = true;
+    }
+    return;
+  }
+
+  if (state.activeControl) {
+    state.activeControl.textContent = state.activeControl.dataset.originalLabel || state.activeControl.textContent;
+    state.activeControl.disabled = false;
+    delete state.activeControl.dataset.originalLabel;
+    state.activeControl = null;
+  }
 }
 
 function log(value, ok) {
   $("#responseLog").textContent = JSON.stringify(value, null, 2);
   $("#responseLog").className = ok ? "ok" : "bad";
+  const consolePanel = $(".console");
+  consolePanel.classList.remove("flash");
+  requestAnimationFrame(() => consolePanel.classList.add("flash"));
+  showToast(ok ? (value?.message || "Request completed") : (value?.message || "Request failed"), !ok);
+}
+
+function updateResponseMeta({ method, path, status, duration, ok }) {
+  const methodBadge = $("#responseMethod");
+  methodBadge.textContent = method;
+  methodBadge.className = `method-badge is-${method.toLowerCase()}`;
+  $("#responsePath").textContent = path;
+  $("#responseStatus").textContent = status;
+  $("#responseStatus").className = `response-stat${ok === undefined ? "" : ok ? " success" : " error"}`;
+  $("#responseTime").textContent = duration;
+}
+
+function resetResponseInspector() {
+  $("#responseLog").textContent = "{}";
+  $("#responseLog").className = "";
+  $("#responseMethod").textContent = "—";
+  $("#responseMethod").className = "method-badge";
+  $("#responsePath").textContent = "No request yet";
+  $("#responseStatus").textContent = "Idle";
+  $("#responseStatus").className = "response-stat";
+  $("#responseTime").textContent = "—";
+}
+
+function showToast(message, isError = false) {
+  const toast = $("#toast");
+  toast.textContent = message;
+  toast.className = `toast show${isError ? " error" : ""}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.className = "toast"; }, 2400);
+}
+
+function setConnectionState(status, label) {
+  const indicator = $("#connectionStatus");
+  indicator.className = `connection-status ${status}`;
+  indicator.innerHTML = `<span class="status-dot"></span>${label}`;
 }
 
 function shortId(value) {
@@ -96,11 +283,24 @@ function updateSelectedBar() {
   $("#selectedPaymentChip").textContent = shortId($("#selectedPaymentId")?.value);
 }
 
+function persistSelections() {
+  state.selections = Object.fromEntries(selectionFields.map((id) => [id, document.getElementById(id)?.value || ""]));
+  localStorage.setItem("reycom.selections", JSON.stringify(state.selections));
+}
+
+function restoreSelections() {
+  selectionFields.forEach((id) => {
+    const input = document.getElementById(id);
+    if (input && state.selections[id]) input.value = state.selections[id];
+  });
+}
+
 function renderSession() {
   const user = state.user;
   $("#sessionUser").textContent = user ? user.email : "Not signed in";
   $("#sessionRole").textContent = user ? user.role : state.token ? "Token saved" : "No token";
   $("#sessionRole").classList.toggle("muted", !user);
+  $("#sessionDot").classList.toggle("online", Boolean(state.token));
 }
 
 function persistAuth(auth) {
@@ -109,6 +309,7 @@ function persistAuth(auth) {
   localStorage.setItem("reycom.token", state.token);
   localStorage.setItem("reycom.user", JSON.stringify(state.user));
   renderSession();
+  showToast(`Signed in as ${state.user.email}`);
 }
 
 function clearAuth() {
@@ -117,6 +318,7 @@ function clearAuth() {
   localStorage.removeItem("reycom.token");
   localStorage.removeItem("reycom.user");
   renderSession();
+  showToast("Session cleared");
 }
 
 function itemCard(title, meta = [], actions = []) {
@@ -278,8 +480,10 @@ function bindForms() {
   $("#loginForm").addEventListener("submit", (event) => {
     event.preventDefault();
     run(async () => {
-      const result = await api("/api/auth/login", { method: "POST", body: JSON.stringify(bodyFromForm(event.target)) });
+      const credentials = bodyFromForm(event.target);
+      const result = await api("/api/auth/login", { method: "POST", body: JSON.stringify(credentials) });
       persistAuth(result.data);
+      rememberCredentials(credentials, result.data.user.role);
       return result;
     });
   });
@@ -287,8 +491,10 @@ function bindForms() {
   $("#registerForm").addEventListener("submit", (event) => {
     event.preventDefault();
     run(async () => {
-      const result = await api("/api/auth/register", { method: "POST", body: JSON.stringify(bodyFromForm(event.target)) });
+      const credentials = bodyFromForm(event.target);
+      const result = await api("/api/auth/register", { method: "POST", body: JSON.stringify(credentials) });
       persistAuth(result.data);
+      rememberCredentials({ email: credentials.email, password: credentials.password }, result.data.user.role);
       return result;
     });
   });
@@ -350,8 +556,50 @@ function bindForms() {
 
 function bindButtons() {
   $("#logoutBtn").addEventListener("click", clearAuth);
-  $("#clearLogBtn").addEventListener("click", () => { $("#responseLog").textContent = "{}"; });
-  $("#meBtn").addEventListener("click", () => run(() => api("/api/users/me")));
+  $("#clearProfilesBtn").addEventListener("click", () => {
+    state.testProfiles = {
+      admin: { ...defaultTestProfiles.admin },
+      client: { ...defaultTestProfiles.client },
+    };
+    localStorage.removeItem("reycom.testProfiles");
+    renderTestProfiles();
+    showToast("Saved test credentials cleared");
+  });
+  $$('[data-login-profile]').forEach((button) => {
+    button.addEventListener("click", () => loginWithProfile(button.dataset.loginProfile));
+  });
+  $$('[data-profile][data-profile-field]').forEach((input) => {
+    input.addEventListener("input", () => {
+      state.testProfiles[input.dataset.profile][input.dataset.profileField] = input.value;
+      persistTestProfiles();
+    });
+  });
+  $("#clearLogBtn").addEventListener("click", resetResponseInspector);
+  $("#copyResponseBtn").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("#responseLog").textContent);
+      showToast("Response copied");
+    } catch {
+      showToast("Could not copy the response", true);
+    }
+  });
+  $("#testConnectionBtn").addEventListener("click", () => {
+    setConnectionState("", "Checking API…");
+    run(() => api("/api/health"));
+  });
+  $("#apiBase").addEventListener("change", (event) => {
+    const value = event.target.value.trim().replace(/\/$/, "");
+    event.target.value = value;
+    localStorage.setItem("reycom.apiBase", value);
+    setConnectionState("", "Not checked");
+    showToast(value ? "API base URL saved" : "Using same-origin API");
+  });
+  $("#meBtn").addEventListener("click", () => run(async () => {
+    const result = await api("/api/users/me");
+    const user = result.data;
+    $("#meBox").innerHTML = itemCard(user.fullName || user.email, [user.email, user.role]);
+    return result;
+  }));
   $("#refreshCategoriesBtn").addEventListener("click", () => run(refreshCategories));
   $("#refreshProductsBtn").addEventListener("click", () => run(refreshProducts));
   $("#refreshInventoryBtn").addEventListener("click", () => run(refreshInventory));
@@ -410,17 +658,23 @@ function bindButtons() {
 
 function bindNavigation() {
   $$(".nav-item").forEach((button) => {
-    button.addEventListener("click", () => {
-      $$(".nav-item").forEach((item) => item.classList.remove("active"));
-      $$(".view").forEach((view) => view.classList.remove("active"));
-      button.classList.add("active");
-      $(`#${button.dataset.view}`).classList.add("active");
-      const [title, subtitle] = titles[button.dataset.view];
-      $("#viewTitle").textContent = title;
-      $("#viewSubtitle").textContent = subtitle;
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
+    button.addEventListener("click", () => navigateTo(button.dataset.view));
   });
+
+  $$('[data-go-view]').forEach((button) => {
+    button.addEventListener("click", () => navigateTo(button.dataset.goView));
+  });
+}
+
+function navigateTo(viewName) {
+  if (!titles[viewName]) return;
+  $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === viewName));
+  $$(".workflow-step").forEach((item) => item.classList.toggle("active", item.dataset.goView === viewName));
+  $$(".view").forEach((view) => view.classList.toggle("active", view.id === viewName));
+  const [title, subtitle] = titles[viewName];
+  $("#viewTitle").textContent = title;
+  $("#viewSubtitle").textContent = subtitle;
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function bindDelegates() {
@@ -457,26 +711,23 @@ function bindDelegates() {
     if (action === "use-payment") $("#selectedPaymentId").value = id;
     if (action === "use-notification") $("#selectedNotificationId").value = id;
     updateSelectedBar();
+    persistSelections();
+    showToast(`Selected ${shortId(id)}`);
   });
 
-  [
-    "#cartProductId",
-    "#inventoryProductId",
-    "#inventoryUpdateProductId",
-    "#cartItemId",
-    "#selectedOrderId",
-    "#paymentOrderId",
-    "#adminOrderId",
-    "#selectedPaymentId",
-    "#selectedNotificationId",
-  ].forEach((selector) => {
-    const input = $(selector);
-    if (input) input.addEventListener("input", updateSelectedBar);
+  selectionFields.forEach((id) => {
+    const input = document.getElementById(id);
+    if (input) input.addEventListener("input", () => {
+      updateSelectedBar();
+      persistSelections();
+    });
   });
 }
 
 function init() {
-  $("#apiBase").value = configuredApiBase();
+  $("#apiBase").value = initialApiBase();
+  restoreSelections();
+  renderTestProfiles();
   renderSession();
   updateSelectedBar();
   bindNavigation();
