@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Arunodhai/ReyCom/actions/workflows/ci.yml/badge.svg)](https://github.com/Arunodhai/ReyCom/actions/workflows/ci.yml)
 
-ReyCom is a Spring Boot e-commerce backend with a lightweight browser console for testing the APIs.
+ReyCom is a full-stack Spring Boot e-commerce application with a customer storefront, role-aware administration, and a separate developer console for direct API testing.
 
 ## Run Locally Without Docker
 
@@ -21,7 +21,8 @@ Run the backend from your machine:
 Open:
 
 - Backend API: http://localhost:8080
-- Spring-served ReyCom Console: http://localhost:8080/console/
+- Spring-served ReyCom Storefront: http://localhost:8080/console/
+- Developer API Console: http://localhost:8080/console/developer/
 - Swagger/OpenAPI: http://localhost:8080/swagger-ui/index.html
 - DynamoDB Local: http://localhost:8000
 - Kafka UI: http://localhost:8081
@@ -47,7 +48,8 @@ docker compose up --build
 Open:
 
 - Backend API: http://localhost:8080
-- ReyCom Console: http://localhost:3000
+- ReyCom Storefront: http://localhost:3000
+- Developer API Console: http://localhost:3000/developer/
 - Swagger/OpenAPI: http://localhost:8080/swagger-ui/index.html
 - DynamoDB Local: http://localhost:8000
 - Kafka UI: http://localhost:8081
@@ -87,15 +89,17 @@ Table definition:
 - Sort key: `eventTime` String
 - Billing mode: `PAY_PER_REQUEST`
 
-## Console API Base URL
+## Storefront And Developer Console
 
-The Docker console is served by Nginx on port `3000`. It receives `VITE_API_BASE_URL` from `.env` and writes it into `env-config.js` at container startup. The default value is:
+The Docker storefront is served by Nginx on port `3000`. It includes customer authentication, product discovery, cart, checkout, orders, notifications, account management, and a role-protected admin workspace. The original API testing console remains available under `/developer/`.
+
+Both interfaces receive `VITE_API_BASE_URL` from `.env` through `env-config.js` at container startup. The default value is:
 
 ```bash
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-The console served from Spring Boot at `http://localhost:8080/console/` uses the same origin by default.
+The storefront served from Spring Boot at `http://localhost:8080/console/` uses the same origin by default.
 
 ## Tests
 
